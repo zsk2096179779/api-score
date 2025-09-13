@@ -1,0 +1,34 @@
+spring:
+  profiles:
+    active: dev   # ← 这里切到 dev，就会加载 application-dev.yml
+
+server:
+  port: 8090
+
+logging:
+  file:
+    name: app.log
+    max-size: 50MB
+  charset:
+    console: UTF-8
+    file: UTF-8
+  level:
+    root: INFO
+
+mybatis:
+  mapper-locations: classpath:/mapper/*.xml   # ← 你的XML在 resources/mapper 下
+  configuration:
+    map-underscore-to-camel-case: true
+
+feature:
+  useDb: true   # ← 关键！让控制器走数据库分支
+
+async_config:
+  corePoolSize: 10
+  maxPoolSize: 200
+  queueCapacity: 10
+
+scheduleEnable: false
+ADScheduleEnable: false
+
+alertPushUrl: http://httpbin.org/post

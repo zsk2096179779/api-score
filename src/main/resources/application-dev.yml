@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    driver-class-name: com.ibm.db2.jcc.DB2Driver
+    url: jdbc:db2://119.45.250.136:50000/testdb:currentSchema=BLAST_DEV_TO_CLOUD;
+    username: db2inst1
+    password: blast_db2_2021
+
