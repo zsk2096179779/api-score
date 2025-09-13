@@ -82,7 +82,7 @@
                 SELECT
                     si.SUBINDEX_ID,
                     si.SUBINDEX_NAME,
-                    si.INDEX_ID   AS subIndexCode,
+                    si.SUBINDEX_ID   AS subIndexCode,
                     si.WEIGHT     AS subIndexWeight,
                     CASE si.SUBINDEX_NAME
                         WHEN '下料稳定性' THEN 1
@@ -97,7 +97,7 @@
                   AND si.SUBINDEX_NAME IN ('下料稳定性','压量关系稳定性','炉缸工况稳定性','操作炉型稳定性','煤气流分布稳定性')
             ),
 
-            -- 子指数取值（同秒对齐，GENERATE_TIME = 顶层 gt）
+            -- 子指数取值（优先同秒，其次窗内，再次回溯 5 分钟）
             sub_val AS (
                 SELECT
                     tp.w,
@@ -106,15 +106,31 @@
                     sd.subIndexCode,
                     sd.subIndexWeight,
                     d.SUBINDEX_VALUE,
+                    /* 三档优先级：0=同秒；1=窗内；2=回溯窗口（t_start-5min, t_start) */
+                    CASE
+                        WHEN d.GENERATE_TIME = tp.gt THEN 0
+                        WHEN d.GENERATE_TIME BETWEEN w.t_start AND w.t_end THEN 1
+                        ELSE 2
+                        END AS pref,
+                    d.GENERATE_TIME AS dgt,
                     ROW_NUMBER() OVER (
-                    PARTITION BY tp.w, sd.SUBINDEX_ID
-                    ORDER BY d.GENERATE_TIME DESC
-                ) rn
+            PARTITION BY tp.w, sd.SUBINDEX_ID
+            ORDER BY
+                CASE
+                    WHEN d.GENERATE_TIME = tp.gt THEN 0
+                    WHEN d.GENERATE_TIME BETWEEN w.t_start AND w.t_end THEN 1
+                    ELSE 2
+                END ASC,
+                d.GENERATE_TIME DESC
+        ) rn
                 FROM top_pick tp
+                         JOIN win w ON w.w = tp.w
                          CROSS JOIN sub_def sd
                          LEFT JOIN T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d
                                    ON d.SUBINDEX_ID = sd.SUBINDEX_ID
-                                       AND d.GENERATE_TIME = tp.gt
+                                       AND d.GENERATE_TIME BETWEEN (w.t_start - 5 MINUTES) AND w.t_end
+                -- 如果存在高炉维度，可开启如下限制确保同一高炉：
+                -- AND d.BLAST_ID = tp.blastId
             ),
             sub_pick AS (
                 SELECT
@@ -127,6 +143,7 @@
                 FROM sub_val
                 WHERE rn = 1 OR rn IS NULL
             ),
+
 
             -- 评价参数定义（从权重与参数信息表挂到各子指数）
             param_def AS (
@@ -151,15 +168,21 @@
                     pd.paramName,
                     pd.paramWeight,
                     psd.DATA_VALUE           AS paramValue,
+                    /* 优先同秒 */
+                    CASE WHEN psd.FETCH_TIME = tp.gt THEN 0 ELSE 1 END AS pref,
+                    psd.FETCH_TIME AS ft,
                     ROW_NUMBER() OVER (
                     PARTITION BY tp.w, pd.SUBINDEX_ID, pd.paramCode
-                    ORDER BY psd.FETCH_TIME DESC
+                    ORDER BY
+                    CASE WHEN psd.FETCH_TIME = tp.gt THEN 0 ELSE 1 END ASC,
+                    psd.FETCH_TIME DESC
                 ) rn
                 FROM top_pick tp
-                         JOIN param_def pd ON 1 = 1
+                         JOIN win w ON w.w = tp.w
+                         JOIN param_def pd ON 1=1
                          LEFT JOIN T_MD_DIAGNOSE_PARAM_SCORE_DATA psd
                                    ON psd.PARAM_SCORE_ID = pd.paramCode
-                                       AND psd.FETCH_TIME = tp.gt
+                                       AND psd.FETCH_TIME BETWEEN w.t_start AND w.t_end
             ),
             param_pick AS (
                 SELECT
