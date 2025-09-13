@@ -2656,3 +2656,187 @@ com.ibm.db2.jcc.am.SqlSyntaxErrorException: DB2 SQL Error: SQLCODE=-418, SQLSTAT
 2025-09-13T18:43:53.061+08:00  INFO 12944 --- [score-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
 2025-09-13T18:43:53.078+08:00  INFO 12944 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
 2025-09-13T18:43:53.080+08:00  INFO 12944 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-09-13T18:56:48.054+08:00  INFO 30064 --- [score-api] [main] com.example.score.ScoreApiApplication    : Starting ScoreApiApplication using Java 17.0.14 with PID 30064 (F:\Users\lenovo\Desktop\score-api\target\classes started by lenovo in F:\Users\lenovo\Desktop\score-api)
+2025-09-13T18:56:48.055+08:00  INFO 30064 --- [score-api] [main] com.example.score.ScoreApiApplication    : The following 1 profile is active: "dev"
+2025-09-13T18:56:48.451+08:00  INFO 30064 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+2025-09-13T18:56:48.457+08:00  INFO 30064 --- [score-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-09-13T18:56:48.457+08:00  INFO 30064 --- [score-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-09-13T18:56:48.485+08:00  INFO 30064 --- [score-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-09-13T18:56:48.485+08:00  INFO 30064 --- [score-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 411 ms
+2025-09-13T18:56:48.755+08:00  INFO 30064 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+2025-09-13T18:56:48.760+08:00  INFO 30064 --- [score-api] [main] com.example.score.ScoreApiApplication    : Started ScoreApiApplication in 0.936 seconds (process running for 1.23)
+2025-09-13T18:56:51.615+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-13T18:56:51.616+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-09-13T18:56:51.616+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2025-09-13T18:56:51.661+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] c.e.score.api.ScoreControllerNested      : useDb=true, mapperPresent=true
+2025-09-13T18:56:51.671+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-09-13T18:56:52.863+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.ibm.db2.jcc.t4.b@1ef750d6
+2025-09-13T18:56:52.864+08:00  INFO 30064 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-09-13T18:56:53.309+08:00 ERROR 30064 --- [score-api] [http-nio-8090-exec-1] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: org.springframework.jdbc.BadSqlGrammarException: 
+### Error querying database.  Cause: com.ibm.db2.jcc.am.SqlSyntaxErrorException: DB2 SQL Error: SQLCODE=-418, SQLSTATE=42610, SQLERRMC=unresolved untyped expression, DRIVER=4.34.30
+### The error may exist in file [F:\Users\lenovo\Desktop\score-api\target\classes\mapper\ScoreMapper.xml]
+### The error may involve defaultParameterMap
+### The error occurred while setting parameters
+### SQL: WITH win(w, t_start, t_end, t_in14) AS (             VALUES                 (1, TIMESTAMP_FORMAT(?, 'YYYYMMDDHH24MISS'),                  TIMESTAMP_FORMAT(?, 'YYYYMMDDHH24MISS') + 59 SECONDS, ?),                 (2, TIMESTAMP_FORMAT(?, 'YYYYMMDDHH24MISS'),                  TIMESTAMP_FORMAT(?, 'YYYYMMDDHH24MISS') + 59 SECONDS, ?)         ),               -- 顶层（总指数）：每窗一条（优先等于入参秒，否则窗内最新）              top_src AS (                  SELECT                      w,                      i.GENERATE_TIME                                    AS gt,                      VARCHAR_FORMAT(i.GENERATE_TIME,'YYYYMMDDHH24MISS') AS markTime,                      i.INDEX_VALUE                                      AS topIndexValue,                      CASE WHEN i.GENERATE_TIME = t_start THEN 0 ELSE 1 END AS pref                  FROM (                           SELECT w, t_start, t_end FROM win                       ) x                           JOIN T_MD_DIAGNOSE_MODEL_DATA_INDEX i                                ON i.INDEX_ID = 'B4TEN_I'                                    AND i.GENERATE_TIME BETWEEN x.t_start AND x.t_end              ),              top_pick AS (                  SELECT w, markTime, gt, topIndexValue                  FROM (                           SELECT w, markTime, gt, topIndexValue,                                  ROW_NUMBER() OVER (PARTITION BY w ORDER BY pref ASC, gt DESC) rn                           FROM top_src                       ) t                  WHERE rn = 1              ),               -- 子指数定义清单（固定顺序 + 兜底占位）              sub_def AS (                  SELECT                      si.SUBINDEX_ID,                      si.SUBINDEX_NAME,                      si.INDEX_ID   AS subIndexCode,                      si.WEIGHT     AS subIndexWeight,                      CASE si.SUBINDEX_NAME                          WHEN '下料稳定性' THEN 1                          WHEN '压量关系稳定性' THEN 2                          WHEN '炉缸工况稳定性' THEN 3                          WHEN '操作炉型稳定性' THEN 4                          WHEN '煤气流分布稳定性' THEN 5                          ELSE 99                          END AS ord                  FROM T_MD_DIAGNOSE_MODEL_SUBINDEX_INFO si                  WHERE si.INDEX_ID = 'B4TEN_I'                    AND si.SUBINDEX_NAME IN ('下料稳定性','压量关系稳定性','炉缸工况稳定性','操作炉型稳定性','煤气流分布稳定性')              ),               -- 子指数取值（同秒对齐）              sub_val AS (                  SELECT                      tp.w,                      sd.SUBINDEX_ID,                      sd.SUBINDEX_NAME,                      sd.subIndexCode,                      sd.subIndexWeight,                      d.SUBINDEX_VALUE,                      ROW_NUMBER() OVER (                     PARTITION BY tp.w, sd.SUBINDEX_ID                     ORDER BY d.GENERATE_TIME DESC                 ) rn                  FROM top_pick tp                           CROSS JOIN sub_def sd                           LEFT JOIN T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d                                     ON d.SUBINDEX_ID = sd.SUBINDEX_ID                                         AND VARCHAR_FORMAT(d.GENERATE_TIME,'YYYYMMDDHH24MISS') = tp.markTime              ),              sub_pick AS (                  SELECT                      w,                      SUBINDEX_ID,                      SUBINDEX_NAME,                      subIndexCode,                      subIndexWeight,                      CASE WHEN rn = 1 THEN SUBINDEX_VALUE ELSE NULL END AS subIndexValue                  FROM sub_val                  WHERE rn = 1 OR rn IS NULL              ),               -- 评价参数定义（按子指数取权重，连到参数信息）              param_def AS (                  SELECT                      sd.SUBINDEX_ID,                      w.PARAM_SCORE_ID         AS paramCode,                      psi.NAME                 AS paramName,                      w.WEIGHT                 AS paramWeight                  FROM sub_def sd                           JOIN T_MD_DIAGNOSE_MODEL_PARAM_WEIGHT w                                ON w.SUBINDEX_ID = sd.SUBINDEX_ID                           JOIN T_MD_DIAGNOSE_PARAM_SCORE_INFO psi                                ON psi.PARAM_SCORE_ID = w.PARAM_SCORE_ID              ),               -- 评价参数取值（同秒对齐，FETCH_TIME）              param_val AS (                  SELECT                      tp.w,                      pd.SUBINDEX_ID,                      pd.paramCode,                      pd.paramName,                      pd.paramWeight,                      psd.DATA_VALUE           AS paramValue,                      ROW_NUMBER() OVER (                     PARTITION BY tp.w, pd.SUBINDEX_ID, pd.paramCode                     ORDER BY psd.FETCH_TIME DESC                 ) rn                  FROM top_pick tp                           JOIN param_def pd                                ON 1 = 1                           LEFT JOIN T_MD_DIAGNOSE_PARAM_SCORE_DATA psd                                     ON psd.PARAM_SCORE_ID = pd.paramCode                                         AND VARCHAR_FORMAT(psd.FETCH_TIME,'YYYYMMDDHH24MISS') = tp.markTime              ),              param_pick AS (                  SELECT                      w, SUBINDEX_ID, paramCode, paramName, paramWeight,                      CASE WHEN rn = 1 THEN paramValue ELSE NULL END AS paramValue                  FROM param_val                  WHERE rn = 1 OR rn IS NULL              )          SELECT             -- 顶层             tp.markTime                      AS markTime,             tp.topIndexValue                 AS topIndexValue,              -- 子指数             sp.SUBINDEX_NAME                 AS subIndexName,             sp.subIndexCode                  AS subIndexCode,             sp.subIndexWeight                AS subIndexWeight,             sp.subIndexValue                 AS subIndexValue,              -- 评价参数             pp.paramName                     AS paramName,             pp.paramCode                     AS paramCode,             pp.paramWeight                   AS paramWeight,             pp.paramValue                    AS paramValue          FROM top_pick tp                  LEFT JOIN sub_pick sp                            ON sp.w = tp.w                  LEFT JOIN param_pick pp                            ON pp.w = tp.w                                AND pp.SUBINDEX_ID = sp.SUBINDEX_ID          ORDER BY tp.markTime ASC,                  CASE sp.SUBINDEX_NAME                      WHEN '下料稳定性' THEN 1                      WHEN '压量关系稳定性' THEN 2                      WHEN '炉缸工况稳定性' THEN 3                      WHEN '操作炉型稳定性' THEN 4                      WHEN '煤气流分布稳定性' THEN 5                      ELSE 99                      END,                  pp.paramCode;
+### Cause: com.ibm.db2.jcc.am.SqlSyntaxErrorException: DB2 SQL Error: SQLCODE=-418, SQLSTATE=42610, SQLERRMC=unresolved untyped expression, DRIVER=4.34.30
+; bad SQL grammar []] with root cause
+
+com.ibm.db2.jcc.am.SqlSyntaxErrorException: DB2 SQL Error: SQLCODE=-418, SQLSTATE=42610, SQLERRMC=unresolved untyped expression, DRIVER=4.34.30
+	at com.ibm.db2.jcc.am.b5.a(b5.java:810) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.b5.a(b5.java:66) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.b5.a(b5.java:140) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kq.c(kq.java:2890) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kq.d(kq.java:2874) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kq.a(kq.java:2278) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.a(kr.java:8479) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.t4.aa.i(aa.java:202) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.t4.aa.b(aa.java:92) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.t4.p.a(p.java:32) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.t4.au.i(au.java:150) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kq.al(kq.java:2247) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.bq(kr.java:3909) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.a(kr.java:4792) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.b(kr.java:4363) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.bg(kr.java:3027) ~[db2jcc-4.34.30.jar:na]
+	at com.ibm.db2.jcc.am.kr.execute(kr.java:3002) ~[db2jcc-4.34.30.jar:na]
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.execute(ProxyPreparedStatement.java:44) ~[HikariCP-6.3.2.jar:na]
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.execute(HikariProxyPreparedStatement.java) ~[HikariCP-6.3.2.jar:na]
+	at org.apache.ibatis.executor.statement.PreparedStatementHandler.query(PreparedStatementHandler.java:65) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.statement.RoutingStatementHandler.query(RoutingStatementHandler.java:80) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.SimpleExecutor.doQuery(SimpleExecutor.java:65) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.BaseExecutor.queryFromDatabase(BaseExecutor.java:336) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.BaseExecutor.query(BaseExecutor.java:158) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.CachingExecutor.query(CachingExecutor.java:110) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.executor.CachingExecutor.query(CachingExecutor.java:90) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.session.defaults.DefaultSqlSession.selectList(DefaultSqlSession.java:154) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.session.defaults.DefaultSqlSession.selectList(DefaultSqlSession.java:147) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.session.defaults.DefaultSqlSession.selectList(DefaultSqlSession.java:142) ~[mybatis-3.5.19.jar:3.5.19]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77) ~[na:na]
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569) ~[na:na]
+	at org.mybatis.spring.SqlSessionTemplate$SqlSessionInterceptor.invoke(SqlSessionTemplate.java:333) ~[mybatis-spring-3.0.5.jar:3.0.5]
+	at jdk.proxy2/jdk.proxy2.$Proxy64.selectList(Unknown Source) ~[na:na]
+	at org.mybatis.spring.SqlSessionTemplate.selectList(SqlSessionTemplate.java:194) ~[mybatis-spring-3.0.5.jar:3.0.5]
+	at org.apache.ibatis.binding.MapperMethod.executeForMany(MapperMethod.java:147) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.binding.MapperMethod.execute(MapperMethod.java:80) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.binding.MapperProxy$PlainMethodInvoker.invoke(MapperProxy.java:141) ~[mybatis-3.5.19.jar:3.5.19]
+	at org.apache.ibatis.binding.MapperProxy.invoke(MapperProxy.java:86) ~[mybatis-3.5.19.jar:3.5.19]
+	at jdk.proxy2/jdk.proxy2.$Proxy65.selectImpactRows(Unknown Source) ~[na:na]
+	at com.example.score.api.ScoreControllerNested.getNested(ScoreControllerNested.java:69) ~[classes/:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77) ~[na:na]
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569) ~[na:na]
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:258) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:191) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:991) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:896) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1089) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:979) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1014) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590) ~[tomcat-embed-core-10.1.44.jar:6.0]
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885) ~[spring-webmvc-6.2.10.jar:6.2.10]
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658) ~[tomcat-embed-core-10.1.44.jar:6.0]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:195) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51) ~[tomcat-embed-websocket-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116) ~[spring-web-6.2.10.jar:6.2.10]
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:164) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:140) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:483) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:116) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:344) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:398) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:903) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1769) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1189) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:658) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.44.jar:10.1.44]
+	at java.base/java.lang.Thread.run(Thread.java:840) ~[na:na]
+
+2025-09-13T20:32:26.582+08:00  WARN 30064 --- [score-api] [HikariPool-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection com.ibm.db2.jcc.t4.b@194d0038 ([jcc][t4][10335][10366][4.34.30] 操作无效：连接已关闭。 ERRORCODE=-4470, SQLSTATE=08003). Possibly consider using a shorter maxLifetime value.
+2025-09-13T22:10:57.437+08:00  INFO 30064 --- [score-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-09-13T22:10:57.464+08:00  INFO 30064 --- [score-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-09-13T22:10:57.469+08:00  INFO 30064 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-09-13T22:10:57.473+08:00  INFO 30064 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-09-13T22:10:59.389+08:00  INFO 35672 --- [score-api] [main] com.example.score.ScoreApiApplication    : Starting ScoreApiApplication using Java 17.0.14 with PID 35672 (F:\Users\lenovo\Desktop\score-api\target\classes started by lenovo in F:\Users\lenovo\Desktop\score-api)
+2025-09-13T22:10:59.390+08:00  INFO 35672 --- [score-api] [main] com.example.score.ScoreApiApplication    : The following 1 profile is active: "dev"
+2025-09-13T22:10:59.820+08:00  INFO 35672 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+2025-09-13T22:10:59.827+08:00  INFO 35672 --- [score-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-09-13T22:10:59.827+08:00  INFO 35672 --- [score-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-09-13T22:10:59.863+08:00  INFO 35672 --- [score-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-09-13T22:10:59.864+08:00  INFO 35672 --- [score-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 453 ms
+2025-09-13T22:11:00.181+08:00  INFO 35672 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+2025-09-13T22:11:00.185+08:00  INFO 35672 --- [score-api] [main] com.example.score.ScoreApiApplication    : Started ScoreApiApplication in 1.039 seconds (process running for 1.372)
+2025-09-13T22:11:04.079+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-13T22:11:04.079+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-09-13T22:11:04.080+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2025-09-13T22:11:04.122+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] c.e.score.api.ScoreControllerNested      : useDb=true, mapperPresent=true
+2025-09-13T22:11:04.132+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-09-13T22:11:05.904+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.ibm.db2.jcc.t4.b@3d0cd0a4
+2025-09-13T22:11:05.905+08:00  INFO 35672 --- [score-api] [http-nio-8090-exec-2] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-09-13T22:56:50.578+08:00  INFO 35672 --- [score-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-09-13T22:56:50.603+08:00  INFO 35672 --- [score-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-09-13T22:56:50.606+08:00  INFO 35672 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-09-13T22:56:50.608+08:00  INFO 35672 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-09-13T22:56:53.108+08:00  INFO 35524 --- [score-api] [main] com.example.score.ScoreApiApplication    : Starting ScoreApiApplication using Java 17.0.14 with PID 35524 (F:\Users\lenovo\Desktop\score-api\target\classes started by lenovo in F:\Users\lenovo\Desktop\score-api)
+2025-09-13T22:56:53.109+08:00  INFO 35524 --- [score-api] [main] com.example.score.ScoreApiApplication    : The following 1 profile is active: "dev"
+2025-09-13T22:56:53.512+08:00  INFO 35524 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+2025-09-13T22:56:53.519+08:00  INFO 35524 --- [score-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-09-13T22:56:53.519+08:00  INFO 35524 --- [score-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-09-13T22:56:53.553+08:00  INFO 35524 --- [score-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-09-13T22:56:53.554+08:00  INFO 35524 --- [score-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 425 ms
+2025-09-13T22:56:53.869+08:00  INFO 35524 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+2025-09-13T22:56:53.874+08:00  INFO 35524 --- [score-api] [main] com.example.score.ScoreApiApplication    : Started ScoreApiApplication in 0.988 seconds (process running for 1.27)
+2025-09-13T22:56:56.809+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-13T22:56:56.809+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-09-13T22:56:56.810+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2025-09-13T22:56:56.853+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] c.e.score.api.ScoreControllerNested      : useDb=true, mapperPresent=true
+2025-09-13T22:56:56.862+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-09-13T22:56:58.377+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.ibm.db2.jcc.t4.b@4c5e66b7
+2025-09-13T22:56:58.378+08:00  INFO 35524 --- [score-api] [http-nio-8090-exec-7] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-09-13T22:58:22.426+08:00  INFO 35524 --- [score-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-09-13T22:58:22.485+08:00  INFO 35524 --- [score-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-09-13T22:58:22.489+08:00  INFO 35524 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-09-13T22:58:22.494+08:00  INFO 35524 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-09-13T23:50:35.319+08:00  INFO 6232 --- [score-api] [main] com.example.score.ScoreApiApplication    : Starting ScoreApiApplication using Java 17.0.14 with PID 6232 (F:\Users\lenovo\Desktop\score-api\target\classes started by lenovo in F:\Users\lenovo\Desktop\score-api)
+2025-09-13T23:50:35.323+08:00  INFO 6232 --- [score-api] [main] com.example.score.ScoreApiApplication    : The following 1 profile is active: "dev"
+2025-09-13T23:50:36.679+08:00  INFO 6232 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8090 (http)
+2025-09-13T23:50:36.695+08:00  INFO 6232 --- [score-api] [main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-09-13T23:50:36.695+08:00  INFO 6232 --- [score-api] [main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-09-13T23:50:36.780+08:00  INFO 6232 --- [score-api] [main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-09-13T23:50:36.782+08:00  INFO 6232 --- [score-api] [main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1400 ms
+2025-09-13T23:50:37.721+08:00  INFO 6232 --- [score-api] [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8090 (http) with context path '/'
+2025-09-13T23:50:37.733+08:00  INFO 6232 --- [score-api] [main] com.example.score.ScoreApiApplication    : Started ScoreApiApplication in 3.113 seconds (process running for 4.088)
+2025-09-13T23:50:50.654+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-13T23:50:50.654+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-09-13T23:50:50.654+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2025-09-13T23:50:50.808+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] c.e.score.api.ScoreControllerNested      : useDb=true, mapperPresent=true
+2025-09-13T23:50:50.832+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-09-13T23:50:52.919+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.ibm.db2.jcc.t4.b@4a9c865b
+2025-09-13T23:50:52.919+08:00  INFO 6232 --- [score-api] [http-nio-8090-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-09-13T23:51:59.137+08:00  INFO 6232 --- [score-api] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-09-13T23:51:59.232+08:00  INFO 6232 --- [score-api] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-09-13T23:51:59.247+08:00  INFO 6232 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-09-13T23:51:59.253+08:00  INFO 6232 --- [score-api] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

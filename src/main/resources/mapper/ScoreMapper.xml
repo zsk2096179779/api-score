@@ -5,136 +5,207 @@
 
 <mapper namespace="com.example.score.mapper.ScoreMapper">
 
-    <!-- ImpactRow 映射：顶层 + 子指数 -->
+    <!-- ImpactRow 映射（总指数/子指数/评价参数；第四层预留） -->
     <resultMap id="ImpactRowMap" type="com.example.score.domain.ImpactRow">
-        <result property="markTime"         column="markTime"/>
-        <result property="topIndexValue"    column="topIndexValue"/>
+        <!-- 顶层 -->
+        <result property="markTime"       column="markTime"/>
+        <result property="topIndexValue"  column="topIndexValue"/>
 
-        <result property="subIndexName"     column="subIndexName"/>
-        <result property="subIndexCode"     column="subIndexCode"/>
-        <result property="subIndexWeight"   column="subIndexWeight"/>
-        <result property="subIndexValue"    column="subIndexValue"/>
+        <!-- 子指数 -->
+        <result property="subIndexName"   column="subIndexName"/>
+        <result property="subIndexCode"   column="subIndexCode"/>
+        <result property="subIndexWeight" column="subIndexWeight"/>
+        <result property="subIndexValue"  column="subIndexValue"/>
 
-        <!-- 其余字段保留为空（扩展用） -->
-        <result property="paramName"        column="paramName"/>
-        <result property="paramCode"        column="paramCode"/>
-        <result property="paramWeight"      column="paramWeight"/>
-        <result property="paramValue"       column="paramValue"/>
-        <result property="basicName"        column="basicName"/>
-        <result property="basicCode"        column="basicCode"/>
-        <result property="basicUnit"        column="basicUnit"/>
-        <result property="basicValue"       column="basicValue"/>
-        <result property="blastName"        column="blastName"/>
-        <result property="procParamId"      column="procParamId"/>
+        <!-- 评价参数 -->
+        <result property="paramName"      column="paramName"/>
+        <result property="paramCode"      column="paramCode"/>
+        <result property="paramWeight"    column="paramWeight"/>
+        <result property="paramValue"     column="paramValue"/>
+
+        <!-- 预留（未用） -->
+        <result property="basicName"      column="basicName"/>
+        <result property="basicCode"      column="basicCode"/>
+        <result property="basicUnit"      column="basicUnit"/>
+        <result property="basicValue"     column="basicValue"/>
+        <result property="blastName"      column="blastName"/>
+        <result property="procParamId"    column="procParamId"/>
     </resultMap>
 
-    <select id="selectImpactRows" resultMap="ImpactRowMap" timeout="15">
-        -- 两段时间窗：[time, time+59s]；显式类型，避免 -418
-        WITH win(w, t_start, t_end, t_in14) AS (
-            SELECT
-                1,
-                TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS'),
-                TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS') + 59 SECONDS,
-                CAST(#{time1} AS CHAR(14))
-            FROM SYSIBM.SYSDUMMY1
-            UNION ALL
-            SELECT
-                2,
-                TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS'),
-                TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS') + 59 SECONDS,
-                CAST(#{time2} AS CHAR(14))
-            FROM SYSIBM.SYSDUMMY1
-        ),
+    <!--
+      规则：
+      1) 每个入参 time 建一个窗口 [time, time+59s]；
+         顶层在窗口里优先取“等于入参秒”的记录，否则取窗内最新；
+         markTime=顶层 GENERATE_TIME 的14位；value=INDEX_VALUE。
+      2) 子指数/评价参数都与顶层时刻“同秒”对齐：
+         子指数按 GENERATE_TIME 同秒；参数按 FETCH_TIME 同秒。
+      3) 仅处理 INDEX_ID='B4TEN_I'；子指数限定五个名称以保证顺序。
+    -->
+    <select id="selectImpactRows" resultMap="ImpactRowMap" timeout="20">
+        WITH
+            -- 注意这里只声明三列，VALUES 也只给三列，避免 -418
+            win(w, t_start, t_end) AS (
+                VALUES
+                    (1,
+                     TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS'),
+                     TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS') + 59 SECONDS),
+                    (2,
+                     TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS'),
+                     TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS') + 59 SECONDS)
+            ),
 
-             -- 顶层(总指数)：MODEL_DATA_INDEX，挑每个时间窗一条（优先等于入参秒，其次窗内最新）
-             top_src AS (
-                 SELECT
-                     w.w,
-                     i.GENERATE_TIME                                    AS gt,
-                     VARCHAR_FORMAT(i.GENERATE_TIME,'YYYYMMDDHH24MISS') AS markTime,
-                     i.INDEX_VALUE                                      AS topIndexValue,
-                     CASE WHEN i.GENERATE_TIME = w.t_start THEN 0 ELSE 1 END AS pref
-                 FROM win w
-                          JOIN T_MD_DIAGNOSE_MODEL_DATA_INDEX i
-                               ON i.INDEX_ID = 'B4TEN_I'
-                                   AND i.GENERATE_TIME BETWEEN w.t_start AND w.t_end
-             ),
-             top_pick AS (
-                 SELECT w, markTime, gt, topIndexValue
-                 FROM (
-                          SELECT
-                              w, markTime, gt, topIndexValue,
-                              ROW_NUMBER() OVER (PARTITION BY w ORDER BY pref ASC, gt DESC) rn
-                          FROM top_src
-                      ) t
-                 WHERE rn = 1
-             ),
+            -- 顶层（总指数）：每窗一条（优先等于入参秒，否则窗内最新）
+            top_src AS (
+                SELECT
+                    w.w,
+                    i.GENERATE_TIME                                    AS gt,
+                    VARCHAR_FORMAT(i.GENERATE_TIME,'YYYYMMDDHH24MISS') AS markTime,
+                    i.INDEX_VALUE                                      AS topIndexValue,
+                    CASE WHEN i.GENERATE_TIME = w.t_start THEN 0 ELSE 1 END AS pref
+                FROM win w
+                         JOIN T_MD_DIAGNOSE_MODEL_DATA_INDEX i
+                              ON i.INDEX_ID = 'B4TEN_I'
+                                  AND i.GENERATE_TIME BETWEEN w.t_start AND w.t_end
+            ),
+            top_pick AS (
+                SELECT w, markTime, gt, topIndexValue
+                FROM (
+                         SELECT w, markTime, gt, topIndexValue,
+                                ROW_NUMBER() OVER (PARTITION BY w ORDER BY pref ASC, gt DESC) rn
+                         FROM top_src
+                     ) t
+                WHERE rn = 1
+            ),
 
-             -- 子指数定义：仅取属于 B4TEN_I 的五个；并给定固定顺序
-             sub_def AS (
-                 SELECT
-                     si.SUBINDEX_ID,
-                     si.SUBINDEX_NAME,
-                     si.INDEX_ID   AS subIndexCode,
-                     si.WEIGHT     AS subIndexWeight,
-                     CASE si.SUBINDEX_NAME
-                         WHEN '下料稳定性'     THEN 1
-                         WHEN '压量关系稳定性' THEN 2
-                         WHEN '炉缸工况稳定性' THEN 3
-                         WHEN '操作炉型稳定性' THEN 4
-                         WHEN '煤气流分布稳定性' THEN 5
-                         ELSE 99
-                         END AS ord
-                 FROM T_MD_DIAGNOSE_MODEL_SUBINDEX_INFO si
-                 WHERE si.INDEX_ID = 'B4TEN_I'
-                   AND si.SUBINDEX_NAME IN ('下料稳定性','压量关系稳定性','炉缸工况稳定性','操作炉型稳定性','煤气流分布稳定性')
-             ),
+            -- 子指数定义清单（固定顺序 + 兜底占位）
+            sub_def AS (
+                SELECT
+                    si.SUBINDEX_ID,
+                    si.SUBINDEX_NAME,
+                    si.INDEX_ID   AS subIndexCode,
+                    si.WEIGHT     AS subIndexWeight,
+                    CASE si.SUBINDEX_NAME
+                        WHEN '下料稳定性' THEN 1
+                        WHEN '压量关系稳定性' THEN 2
+                        WHEN '炉缸工况稳定性' THEN 3
+                        WHEN '操作炉型稳定性' THEN 4
+                        WHEN '煤气流分布稳定性' THEN 5
+                        ELSE 99
+                        END AS ord
+                FROM T_MD_DIAGNOSE_MODEL_SUBINDEX_INFO si
+                WHERE si.INDEX_ID = 'B4TEN_I'
+                  AND si.SUBINDEX_NAME IN ('下料稳定性','压量关系稳定性','炉缸工况稳定性','操作炉型稳定性','煤气流分布稳定性')
+            ),
 
-             -- 子指数取值：与顶层选出的同一秒对齐（GENERATE_TIME = 顶层 gt）
-             sub_match AS (
-                 SELECT
-                     tp.w,
-                     tp.markTime,
-                     sd.SUBINDEX_NAME,
-                     sd.subIndexCode,
-                     sd.subIndexWeight,
-                     d.SUBINDEX_VALUE,
-                     ROW_NUMBER() OVER (
-              PARTITION BY tp.w, sd.SUBINDEX_ID
-              ORDER BY d.GENERATE_TIME DESC
-          ) rn
-                 FROM top_pick tp
-                          CROSS JOIN sub_def sd
-                          LEFT JOIN T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d
-                                    ON d.SUBINDEX_ID   = sd.SUBINDEX_ID
-                                        AND d.GENERATE_TIME = tp.gt
-             )
+            -- 子指数取值（同秒对齐，GENERATE_TIME = 顶层 gt）
+            sub_val AS (
+                SELECT
+                    tp.w,
+                    sd.SUBINDEX_ID,
+                    sd.SUBINDEX_NAME,
+                    sd.subIndexCode,
+                    sd.subIndexWeight,
+                    d.SUBINDEX_VALUE,
+                    ROW_NUMBER() OVER (
+                    PARTITION BY tp.w, sd.SUBINDEX_ID
+                    ORDER BY d.GENERATE_TIME DESC
+                ) rn
+                FROM top_pick tp
+                         CROSS JOIN sub_def sd
+                         LEFT JOIN T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d
+                                   ON d.SUBINDEX_ID = sd.SUBINDEX_ID
+                                       AND d.GENERATE_TIME = tp.gt
+            ),
+            sub_pick AS (
+                SELECT
+                    w,
+                    SUBINDEX_ID,
+                    SUBINDEX_NAME,
+                    subIndexCode,
+                    subIndexWeight,
+                    CASE WHEN rn = 1 THEN SUBINDEX_VALUE ELSE NULL END AS subIndexValue
+                FROM sub_val
+                WHERE rn = 1 OR rn IS NULL
+            ),
+
+            -- 评价参数定义（从权重与参数信息表挂到各子指数）
+            param_def AS (
+                SELECT
+                    sd.SUBINDEX_ID,
+                    w.PARAM_SCORE_ID         AS paramCode,
+                    psi.NAME                 AS paramName,
+                    w.WEIGHT                 AS paramWeight
+                FROM sub_def sd
+                         JOIN T_MD_DIAGNOSE_MODEL_PARAM_WEIGHT w
+                              ON w.SUBINDEX_ID = sd.SUBINDEX_ID
+                         JOIN T_MD_DIAGNOSE_PARAM_SCORE_INFO psi
+                              ON psi.PARAM_SCORE_ID = w.PARAM_SCORE_ID
+            ),
+
+            -- 评价参数取值（同秒对齐，FETCH_TIME = 顶层 gt）
+            param_val AS (
+                SELECT
+                    tp.w,
+                    pd.SUBINDEX_ID,
+                    pd.paramCode,
+                    pd.paramName,
+                    pd.paramWeight,
+                    psd.DATA_VALUE           AS paramValue,
+                    ROW_NUMBER() OVER (
+                    PARTITION BY tp.w, pd.SUBINDEX_ID, pd.paramCode
+                    ORDER BY psd.FETCH_TIME DESC
+                ) rn
+                FROM top_pick tp
+                         JOIN param_def pd ON 1 = 1
+                         LEFT JOIN T_MD_DIAGNOSE_PARAM_SCORE_DATA psd
+                                   ON psd.PARAM_SCORE_ID = pd.paramCode
+                                       AND psd.FETCH_TIME = tp.gt
+            ),
+            param_pick AS (
+                SELECT
+                    w, SUBINDEX_ID, paramCode, paramName, paramWeight,
+                    CASE WHEN rn = 1 THEN paramValue ELSE NULL END AS paramValue
+                FROM param_val
+                WHERE rn = 1 OR rn IS NULL
+            )
 
         SELECT
-            tp.markTime                       AS markTime,        -- 顶层 markTime（来自 MODEL_DATA_INDEX）
-            tp.topIndexValue                  AS topIndexValue,   -- 顶层 value = INDEX_VALUE
+            -- 顶层
+            tp.markTime                      AS markTime,
+            tp.topIndexValue                 AS topIndexValue,
 
-            sm.SUBINDEX_NAME                  AS subIndexName,    -- 子指数 name
-            sm.subIndexCode                   AS subIndexCode,    -- 子指数 code = SUBINDEX_INFO.INDEX_ID
-            sm.subIndexWeight                 AS subIndexWeight,  -- 子指数 weight
-            sm.SUBINDEX_VALUE                 AS subIndexValue    -- 子指数 value = DATA_SUBINDEX.SUBINDEX_VALUE
+            -- 子指数
+            sp.SUBINDEX_NAME                 AS subIndexName,
+            sp.subIndexCode                  AS subIndexCode,
+            sp.subIndexWeight                AS subIndexWeight,
+            sp.subIndexValue                 AS subIndexValue,
+
+            -- 评价参数
+            pp.paramName                     AS paramName,
+            pp.paramCode                     AS paramCode,
+            pp.paramWeight                   AS paramWeight,
+            pp.paramValue                    AS paramValue
 
         FROM top_pick tp
-                 LEFT JOIN (SELECT * FROM sub_match WHERE rn = 1) sm
-                           ON sm.w = tp.w
+                 LEFT JOIN sub_pick sp
+                           ON sp.w = tp.w
+                 LEFT JOIN param_pick pp
+                           ON pp.w = tp.w
+                               AND pp.SUBINDEX_ID = sp.SUBINDEX_ID
 
         ORDER BY tp.markTime ASC,
-                 CASE sm.SUBINDEX_NAME
-                     WHEN '下料稳定性'     THEN 1
+                 CASE sp.SUBINDEX_NAME
+                     WHEN '下料稳定性' THEN 1
                      WHEN '压量关系稳定性' THEN 2
                      WHEN '炉缸工况稳定性' THEN 3
                      WHEN '操作炉型稳定性' THEN 4
                      WHEN '煤气流分布稳定性' THEN 5
                      ELSE 99
-                     END;
+                     END,
+                 pp.paramCode;
     </select>
 
-    <!-- 预留：第三层过程数据批量取值（当前阶段不使用） -->
+    <!-- 预留：第四层（过程数据批量取值） -->
     <select id="selectProcessDataValuesBatch" resultType="map">
         SELECT t.PARAMID AS paramId, t.VALUE AS value
         FROM ${table} t
@@ -144,4 +215,5 @@
             #{pid}
         </foreach>
     </select>
+
 </mapper>

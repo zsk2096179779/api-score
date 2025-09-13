@@ -48,15 +48,15 @@ public class ScoreControllerNested {
         log.info("useDb={}, mapperPresent={}", useDb, (scoreMapper != null));
 
         if (!useDb) {
-            // 本地演示（字段形状与正式一致）
+            // Demo 数据（仅结构演示）
             Map<String, Object> s1 = new LinkedHashMap<>();
             s1.put("markTime", t1);
             s1.put("name", "高炉稳定性指数");
             s1.put("code", "B4TEN_I");
             s1.put("weight", null);
-            s1.put("value", null);
+            s1.put("value", 0.8);
             s1.put("unit", null);
-            s1.put("impactFactor", List.of());
+            s1.put("impactFactor", List.of()); // 子指数+参数留空
             Map<String, Object> s2 = new LinkedHashMap<>(s1);
             s2.put("markTime", t2);
             return List.of(s1, s2);
@@ -67,25 +67,15 @@ public class ScoreControllerNested {
         }
 
         List<ImpactRow> rows = scoreMapper.selectImpactRows(t1, t2);
-        log.info("selectImpactRows size={}", (rows == null ? 0 : rows.size()));
-
         if (CollectionUtils.isEmpty(rows)) {
-            // 窗内一个都没命中：按接口格式给两个空占位
-            Map<String, Object> s1 = new LinkedHashMap<>();
-            s1.put("markTime", t1);
-            s1.put("name", "高炉稳定性指数");
-            s1.put("code", "B4TEN_I");
-            s1.put("weight", null);
-            s1.put("value", null);
-            s1.put("unit", null);
-            s1.put("impactFactor", List.of());
-            Map<String, Object> s2 = new LinkedHashMap<>(s1);
-            s2.put("markTime", t2);
+            // 仍需按接口示例返回两条时间占位（impactFactor 为空数组）
+            Map<String, Object> s1 = assembler.emptySnapshot(t1);
+            Map<String, Object> s2 = assembler.emptySnapshot(t2);
             return List.of(s1, s2);
         }
 
-        // ★ 关键：两层结构（总指数 + 子指数五个）
-        return assembler.assembleFirstTwoLayers(rows);
+        // 返回：顶层总指数 + 5 个子指数 +（本次新增）每个子指数下的评价参数清单
+        return assembler.assembleTopSubAndParam(rows);
     }
 
     private String normalize(String in) {
