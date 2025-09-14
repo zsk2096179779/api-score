@@ -166,8 +166,11 @@ import java.util.stream.Collectors;
  */
 public class ImpactAssembler {
 
-    /** 空快照（当该秒无数据时按接口示例返回占位） */
+    /** 空快照（可带 exception） */
     public Map<String, Object> emptySnapshot(String markTime) {
+        return emptySnapshot(markTime, 0);
+    }
+    public Map<String, Object> emptySnapshot(String markTime, Integer exception) {
         Map<String, Object> top = new LinkedHashMap<>();
         top.put("markTime", markTime);
         top.put("name", "高炉稳定性指数");
@@ -175,6 +178,7 @@ public class ImpactAssembler {
         top.put("weight", null);
         top.put("value", null);
         top.put("unit", null);
+        top.put("exception", exception == null ? 0 : exception);
         top.put("impactFactor", new ArrayList<>());
         return top;
     }
@@ -208,6 +212,29 @@ public class ImpactAssembler {
                     .filter(Objects::nonNull)
                     .findFirst()
                     .orElse(null);
+
+            // ⭐ 读取 exceptionFlag（默认 0）
+            int exception = slice.stream()
+                    .map(ImpactRow::getExceptionFlag)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(0);
+
+            // 若休风（1），只返回顶层占位，不返回下层数据
+            if (exception == 1) {
+                Map<String, Object> top = new LinkedHashMap<>();
+                top.put("markTime", markTime);
+                top.put("name", "高炉稳定性指数");
+                top.put("code", "B4TEN_I");
+                top.put("weight", null);
+                top.put("value", null);      // 休风不返回数据
+                top.put("unit", null);
+                top.put("exception", 1);
+                top.put("impactFactor", new ArrayList<>()); // 空
+                out.add(top);
+                continue;
+            }
+
 
             // 3) 二层：按“子指数自身身份”分组 —— 这里选 SUBINDEX_NAME（也可以换 SUBINDEX_ID）
             Map<String, List<ImpactRow>> bySub = slice.stream()
@@ -316,6 +343,7 @@ public class ImpactAssembler {
             top.put("weight", null);
             top.put("value", topValue);
             top.put("unit", null);
+            top.put("exception", 0);           // 正常
             top.put("impactFactor", subList);
 
             out.add(top);

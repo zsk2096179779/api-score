@@ -1,8 +1,6 @@
 package com.example.score.domain;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 
@@ -36,4 +34,9 @@ public class ImpactRow {
     // 动态扩展（暂不用）
     private String     blastName;
     private String     procParamId;
+
+    @Setter
+    @Getter
+    private Integer exceptionFlag;  // 0=正常，1=休风
+
 }
