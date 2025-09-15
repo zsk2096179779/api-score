@@ -1,7 +1,15 @@
+#spring:
+#  datasource:
+#    driver-class-name: com.ibm.db2.jcc.DB2Driver
+#    url: jdbc:db2://119.45.250.136:50000/testdb:currentSchema=BLAST_DEV_TO_CLOUD;
+#    username: db2inst1
+#    password: blast_db2_2021
 spring:
   datasource:
-    driver-class-name: com.ibm.db2.jcc.DB2Driver
-    url: jdbc:db2://119.45.250.136:50000/testdb:currentSchema=BLAST_DEV_TO_CLOUD;
-    username: db2inst1
-    password: blast_db2_2021
-
+    driver-class-name: dm.jdbc.driver.DmDriver
+    url: jdbc:dm://10.81.0.22:52022/IPLATURE
+    username: iplature
+    password: dameng123
+    hikari:
+      maximum-pool-size: 10
+# 如使用 MyBatis-Plus 或 PageHelper，可在这里放分页/方言设置

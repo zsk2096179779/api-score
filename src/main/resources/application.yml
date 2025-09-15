@@ -16,7 +16,7 @@ logging:
     root: INFO
 
 mybatis:
-  mapper-locations: classpath:/mapper/*.xml   # ← 你的XML在 resources/mapper 下
+  mapper-locations: classpath:/mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
 

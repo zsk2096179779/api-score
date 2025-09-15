@@ -43,25 +43,37 @@
          子指数按 GENERATE_TIME 同秒；参数按 FETCH_TIME 同秒。
       3) 仅处理 INDEX_ID='B4TEN_I'；子指数限定五个名称以保证顺序。
     -->
-    <select id="selectImpactRows" resultMap="ImpactRowMap" timeout="20">
+    <select id="selectImpactRows" resultMap="ImpactRowMap" timeout="120">
         WITH
-            -- 注意这里只声明三列，VALUES 也只给三列，避免 -418
+--             -- 注意这里只声明三列，VALUES 也只给三列，避免 -418
+--             win(w, t_start, t_end) AS (
+--                 VALUES
+--                     (1,
+--                      TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS'),
+--                      TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS') + 59 SECONDS),
+--                     (2,
+--                      TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS'),
+--                      TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS') + 59 SECONDS)
+--             ),
             win(w, t_start, t_end) AS (
-                VALUES
-                    (1,
-                     TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS'),
-                     TIMESTAMP_FORMAT(#{time1}, 'YYYYMMDDHH24MISS') + 59 SECONDS),
-                    (2,
-                     TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS'),
-                     TIMESTAMP_FORMAT(#{time2}, 'YYYYMMDDHH24MISS') + 59 SECONDS)
-            ),
+                SELECT 1,
+                       TO_TIMESTAMP(?, 'YYYYMMDDHH24MISS'),
+                       TO_TIMESTAMP(?, 'YYYYMMDDHH24MISS') + INTERVAL '59' SECOND
+                  FROM DUAL
+                UNION ALL
+                SELECT 2,
+                       TO_TIMESTAMP(?, 'YYYYMMDDHH24MISS'),
+                       TO_TIMESTAMP(?, 'YYYYMMDDHH24MISS') + INTERVAL '59' SECOND
+                  FROM DUAL
+              ),
 
             -- 顶层（总指数）：每窗一条（优先等于入参秒，否则窗内最新）
             top_src AS (
                 SELECT
                     w.w,
                     i.GENERATE_TIME                                    AS gt,
-                    VARCHAR_FORMAT(i.GENERATE_TIME,'YYYYMMDDHH24MISS') AS markTime,
+--                     VARCHAR_FORMAT(i.GENERATE_TIME,'YYYYMMDDHH24MISS') AS markTime,
+                    TO_CHAR(i.GENERATE_TIME,'YYYYMMDDHH24MISS')        AS markTime,
                     i.INDEX_VALUE                                      AS topIndexValue,
                     CASE WHEN i.GENERATE_TIME = w.t_start THEN 0 ELSE 1 END AS pref
                 FROM win w
@@ -98,7 +110,11 @@
                 WHERE si.INDEX_ID = 'B4TEN_I'
                   AND si.SUBINDEX_NAME IN ('下料稳定性','压量关系稳定性','炉缸工况稳定性','操作炉型稳定性','煤气流分布稳定性')
             ),
-
+            d_slice AS (
+            SELECT d.SUBINDEX_ID, d.GENERATE_TIME, d.SUBINDEX_VALUE
+            FROM T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d
+            JOIN win w ON d.GENERATE_TIME BETWEEN (w.t_start - INTERVAL '5' MINUTE) AND w.t_end
+            ),
             -- 子指数取值（优先同秒，其次窗内，再次回溯 5 分钟）
             sub_val AS (
                 SELECT
@@ -128,9 +144,8 @@
                 FROM top_pick tp
                          JOIN win w ON w.w = tp.w
                          CROSS JOIN sub_def sd
-                         LEFT JOIN T_MD_DIAGNOSE_MODEL_DATA_SUBINDEX d
+                         LEFT JOIN d_slice d
                                    ON d.SUBINDEX_ID = sd.SUBINDEX_ID
-                                       AND d.GENERATE_TIME BETWEEN (w.t_start - 5 MINUTES) AND w.t_end
                 -- 如果存在高炉维度，可开启如下限制确保同一高炉：
                 -- AND d.BLAST_ID = tp.blastId
             ),
@@ -182,7 +197,7 @@
                 FROM top_pick tp
                          JOIN win w ON w.w = tp.w
                          JOIN param_def pd ON 1=1
-                         LEFT JOIN T_MD_DIAGNOSE_PARAM_SCORE_DATA psd
+                         LEFT JOIN T_MD_DIAGNOSE_PARAM_SCORE_DATA_BG4 psd
                                    ON psd.PARAM_SCORE_ID = pd.paramCode
                                        AND psd.FETCH_TIME BETWEEN w.t_start AND w.t_end
             ),
@@ -194,22 +209,23 @@
                 WHERE rn = 1 OR rn IS NULL
             ),
             -- ④ 评价参数 ⇨ 公式 ⇨ 小参数编码（最多提取前4个，可按需放大）
+            rule_tok_src AS (
+                SELECT r.PARAM_SCORE_ID,
+                       REGEXP_SUBSTR(r.FORMULA,'BPI[0-9]+',1,1) AS tok1,
+                       REGEXP_SUBSTR(r.FORMULA,'BPI[0-9]+',1,2) AS tok2,
+                       REGEXP_SUBSTR(r.FORMULA,'BPI[0-9]+',1,3) AS tok3,
+                       REGEXP_SUBSTR(r.FORMULA,'BPI[0-9]+',1,4) AS tok4
+                FROM T_MD_DIAGNOSE_PARAM_SCORE_CALCULATE_RULE r
+            ),
             rule_tok AS (
-                SELECT
-                    pp.w,
-                    pp.SUBINDEX_ID,
-                    pp.paramCode,
-                    r.FORMULA,
-                    REGEXP_SUBSTR(r.FORMULA, 'BPI[0-9]+', 1, 1) AS tok1,
-                    REGEXP_SUBSTR(r.FORMULA, 'BPI[0-9]+', 1, 2) AS tok2,
-                    REGEXP_SUBSTR(r.FORMULA, 'BPI[0-9]+', 1, 3) AS tok3,
-                    REGEXP_SUBSTR(r.FORMULA, 'BPI[0-9]+', 1, 4) AS tok4
+                SELECT pp.w, pp.SUBINDEX_ID, pp.paramCode,
+                       s.tok1, s.tok2, s.tok3, s.tok4
                 FROM param_pick pp
-                         JOIN T_MD_DIAGNOSE_PARAM_SCORE_CALCULATE_RULE r
-                              ON r.PARAM_SCORE_ID = pp.paramCode
+                         JOIN rule_tok_src s ON s.PARAM_SCORE_ID = pp.paramCode
             ),
 
-            -- 将横向 tok1..tok4 拆成行
+
+-- 将横向 tok1..tok4 拆成行
             basic_code AS (
                 SELECT w, SUBINDEX_ID, paramCode, tok1 AS BASIC_PARAM_ID FROM rule_tok WHERE tok1 IS NOT NULL
                 UNION ALL SELECT w, SUBINDEX_ID, paramCode, tok2 FROM rule_tok WHERE tok2 IS NOT NULL
@@ -235,7 +251,12 @@
                                    ON bi.BLAST_ID = bpi.BLAST_ID
             ),
 
-            -- ⑤ 过程数据取值（只取宝山四高炉表 BG4；同秒优先，窗内次之，再向前回溯 5 分钟）
+            p_slice AS (
+                SELECT p.PARAMID, p.CLOCK, p.VALUE
+                FROM T_MD_DIAGNOSE_PROCESSDATA_BG4 p
+                         JOIN win w ON p.CLOCK BETWEEN (w.t_start - INTERVAL '5' MINUTE) AND w.t_end
+            ),
+                        -- ⑤ 过程数据取值（只取宝山四高炉表 BG4；同秒优先，窗内次之，再向前回溯 5 分钟）
             basic_val AS (
                 SELECT
                     tp.w,
@@ -256,9 +277,9 @@
                 FROM top_pick tp
                          JOIN win w ON w.w = tp.w
                          JOIN basic_def bd ON 1=1
-                         LEFT JOIN T_MD_DIAGNOSE_PROCESSDATA_BG4 p
+                         LEFT JOIN p_slice p
                                    ON p.PARAMID = bd.procParamId
-                                       AND p.CLOCK BETWEEN (w.t_start - 5 MINUTES) AND w.t_end
+                                       AND p.CLOCK BETWEEN (w.t_start - INTERVAL '5' MINUTE) AND w.t_end
             ),
             basic_pick AS (
                 SELECT
